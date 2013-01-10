@@ -11,7 +11,7 @@ import (
 )
 
 type Env struct {
-  symbols map[string](func(_ []int) int)
+  symbols map[string](interface{})
   outerEnv *Env
 }
 
@@ -37,7 +37,7 @@ func reduceInts(init int, f (func(_,_ int) int), nums []int) int {
 
 func add_globals(env *Env) {
   if env.symbols == nil {
-    env.symbols = make(map[string](func(_ []int) int))
+    env.symbols = make(map[string](interface{}))
   }
 
   env.symbols["+"] = func(nums []int) int {
@@ -126,20 +126,15 @@ func read(tokens []string, env *Env) (string, error) {
 }
 
 func eval(exp []string, env *Env) (int, error) {
-  // fmt.Println("env has: ",env)
-  // fmt.Println("We're looking for",exp[0])
   envValue := env.find(exp[0])
   expLen := len(exp[1:]);
   args := make([]int, expLen)
   for i, exp := range exp[1:] {
-    if ")" == exp {
-      break
-    }
     args[i], _ = atomize(exp)
   }
-  // fmt.Println("Eval func: <", exp[0], "> with args: ",arg1,arg2)
-  // fmt.Println("We return: ", envValue.symbols[exp[0]](arg1, arg2))
-  return envValue.symbols[exp[0]](args), nil
+
+  f, _ := envValue.symbols[exp[0]].(func([]int) int)
+  return f(args), nil
 }
 
 func main() {
