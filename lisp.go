@@ -90,17 +90,32 @@ func atomize(token string) (int, error) {
   return strconv.Atoi(token)
 }
 
+func findNextParen(args []string) (int,error) {
+  for i, arg := range args {
+    if arg == ")" {
+      return i, nil
+    }
+  }
+  return 0, errors.New("Unbalanced parens")
+}
+
 func read(tokens []string, env *Env) (string, error) {
   if len(tokens) == 0 {
-    return "", errors.New("unexpected EOF while reading")
+    return "", errors.New("Unexpected EOF while reading")
   }
 
   for i, token := range tokens {
     switch {
     case "(" == token:
-      return strconv.Itoa(eval(tokens[i+1:], env)), nil
+      nextParen, err := findNextParen(tokens[i+1:])
+      if err == nil {
+        retVal, err := eval(tokens[i+1:nextParen+1], env)
+        return strconv.Itoa(retVal), err
+      } else {
+        return "", err
+      }
     case ")" == token:
-      return "",  errors.New("unexpected ')'")
+      return "",  errors.New("Unexpected ')'")
     default:
       s, e := atomize(token)
       return string(s), e
@@ -110,11 +125,12 @@ func read(tokens []string, env *Env) (string, error) {
   return "", nil
 }
 
-func eval(exp []string, env *Env) int {
+func eval(exp []string, env *Env) (int, error) {
   // fmt.Println("env has: ",env)
   // fmt.Println("We're looking for",exp[0])
   envValue := env.find(exp[0])
-  args := make([]int, len(exp[1:])-1)
+  expLen := len(exp[1:]);
+  args := make([]int, expLen)
   for i, exp := range exp[1:] {
     if ")" == exp {
       break
@@ -123,7 +139,7 @@ func eval(exp []string, env *Env) int {
   }
   // fmt.Println("Eval func: <", exp[0], "> with args: ",arg1,arg2)
   // fmt.Println("We return: ", envValue.symbols[exp[0]](arg1, arg2))
-  return envValue.symbols[exp[0]](args)
+  return envValue.symbols[exp[0]](args), nil
 }
 
 func main() {
