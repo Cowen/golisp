@@ -40,36 +40,42 @@ func add_globals(env *Env) {
     env.symbols = make(map[string](interface{}))
   }
 
-  env.symbols["+"] = func(nums []int) int {
-    sum := 0
-    for _, num := range nums {
-      sum += num
+  env.symbols["+"] = func(args []interface{}) int {
+    sum := args[0].(int)
+    for _, num := range args[1:] {
+      sum += num.(int)
     }
     return sum
   }
 
-  env.symbols["-"] = func(nums []int) int {
-    diff := nums[0]
-    for _, num := range nums[1:] {
-      diff -= num
+  env.symbols["-"] = func(args []interface{}) int {
+    diff := args[0].(int)
+    for _, num := range args[1:] {
+      diff -= num.(int)
     }
     return diff
   }
 
-  env.symbols["*"] = func(nums []int) int {
-    prod := nums[0]
-    for _, num := range nums[1:] {
-      prod = prod * num
+  env.symbols["*"] = func(args []interface{}) int {
+    prod := args[0].(int)
+    for _, num := range args[1:] {
+      prod = prod * num.(int)
     }
     return prod
   }
 
-  env.symbols["/"] = func(nums []int) int {
-    quot := nums[0]
-    for _, num := range nums[1:] {
-      quot /= num
+  env.symbols["/"] = func(args []interface{}) int {
+    quot := args[0].(int)
+    for _, num := range args[1:] {
+      quot /= num.(int)
     }
     return quot
+  }
+
+  env.symbols["define"] = func(args []interface{}) int {
+    symbol, val := args[0].(string), args[1]
+    env.symbols[symbol] = val
+    return 0
   }
 }
 
@@ -80,14 +86,16 @@ func tokenize(s string) []string {
   return strings.Fields(rParenStr)
 }
 
-func pop(s []string) (string, []string) {
-  return s[0], s[1:]
-}
+func atomize(token string, env *Env) (interface{}, error) {
+  if v, ok := env.symbols[token]; ok {
+    return v, nil
+  }
 
-func atomize(token string) (int, error) {
-  // Numbers become numbers.
-  // Later, everything else will become values
-  return strconv.Atoi(token)
+  if num, err := strconv.Atoi(token); err == nil {
+    return num, err
+  }
+
+  return token, nil
 }
 
 func findNextParen(args []string) (int,error) {
@@ -117,8 +125,8 @@ func read(tokens []string, env *Env) (string, error) {
     case ")" == token:
       return "",  errors.New("Unexpected ')'")
     default:
-      s, e := atomize(token)
-      return string(s), e
+      a, e := atomize(token, env)
+      return strconv.Itoa(a.(int)), e
     }
   }
 
@@ -126,14 +134,19 @@ func read(tokens []string, env *Env) (string, error) {
 }
 
 func eval(exp []string, env *Env) (int, error) {
-  envValue := env.find(exp[0])
-  expLen := len(exp[1:]);
-  args := make([]int, expLen)
-  for i, exp := range exp[1:] {
-    args[i], _ = atomize(exp)
+  if len(exp) <= 0 {
+    return 0, errors.New("No arguments in expression")
   }
 
-  f, _ := envValue.symbols[exp[0]].(func([]int) int)
+  envValue := env.find(exp[0])
+  expLen := len(exp[1:]);
+  args := make([]interface{}, expLen)
+  for i, exp := range exp[1:] {
+    atom, _ := atomize(exp, env)
+    args[i] = atom
+  }
+
+  f, _ := envValue.symbols[exp[0]].(func([]interface{}) int)
   return f(args), nil
 }
 
