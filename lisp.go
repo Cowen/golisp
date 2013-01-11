@@ -1,4 +1,4 @@
-package main
+package golisp
 
 import (
   "errors"
@@ -79,7 +79,7 @@ func add_globals(env *Env) {
   }
 }
 
-func tokenize(s string) []string {
+func Tokenize(s string) []string {
   // Convert a string into a list of tokens
   lParenStr := strings.Replace(s, "("," ( ", -1)
   rParenStr := strings.Replace(lParenStr, ")"," ) ", -1)
@@ -107,7 +107,7 @@ func findNextParen(args []string) (int,error) {
   return 0, errors.New("Unbalanced parens")
 }
 
-func read(tokens []string, env *Env) (string, error) {
+func Read(tokens []string, env *Env) (string, error) {
   if len(tokens) == 0 {
     return "", errors.New("Unexpected EOF while reading")
   }
@@ -117,7 +117,7 @@ func read(tokens []string, env *Env) (string, error) {
     case "(" == token:
       nextParen, err := findNextParen(tokens[i+1:])
       if err == nil {
-        retVal, err := eval(tokens[i+1:nextParen+1], env)
+        retVal, err := Eval(tokens[i+1:nextParen+1], env)
         return strconv.Itoa(retVal), err
       } else {
         return "", err
@@ -133,7 +133,7 @@ func read(tokens []string, env *Env) (string, error) {
   return "", nil
 }
 
-func eval(exp []string, env *Env) (int, error) {
+func Eval(exp []string, env *Env) (int, error) {
   if len(exp) <= 0 {
     return 0, errors.New("No arguments in expression")
   }
@@ -162,7 +162,7 @@ func main() {
   for err == nil && !isPrefix {
     line := string(buf)
 
-    result, err := read(tokenize(line), &globalEnv)
+    result, err := Read(Tokenize(line), &globalEnv)
     if err == nil {
       fmt.Println(result)
     } else {
