@@ -1,17 +1,17 @@
-package golisp
+package main
 
 import (
-  "errors"
-  "strings"
-  "strconv"
   "bufio"
-  "os"
+  "errors"
   "fmt"
   "io"
+  "os"
+  "strconv"
+  "strings"
 )
 
 type Env struct {
-  symbols map[string](interface{})
+  symbols  map[string](interface{})
   outerEnv *Env
 }
 
@@ -27,7 +27,7 @@ func (env Env) find(v string) Env {
   return Env{}
 }
 
-func reduceInts(init int, f (func(_,_ int) int), nums []int) int {
+func reduceInts(init int, f (func(_, _ int) int), nums []int) int {
   result := init
   for _, num := range nums {
     result = f(result, num)
@@ -81,8 +81,8 @@ func add_globals(env *Env) {
 
 func Tokenize(s string) []string {
   // Convert a string into a list of tokens
-  lParenStr := strings.Replace(s, "("," ( ", -1)
-  rParenStr := strings.Replace(lParenStr, ")"," ) ", -1)
+  lParenStr := strings.Replace(s, "(", " ( ", -1)
+  rParenStr := strings.Replace(lParenStr, ")", " ) ", -1)
   return strings.Fields(rParenStr)
 }
 
@@ -98,7 +98,7 @@ func atomize(token string, env *Env) (interface{}, error) {
   return token, nil
 }
 
-func findNextParen(args []string) (int,error) {
+func findNextParen(args []string) (int, error) {
   for i, arg := range args {
     if arg == ")" {
       return i, nil
@@ -107,30 +107,46 @@ func findNextParen(args []string) (int,error) {
   return 0, errors.New("Unbalanced parens")
 }
 
+func findMatchingParen(args []string) (int, error) {
+  numLeftP := 0
+  for i, arg := range args {
+    switch {
+    case arg == "(":
+      numLeftP += 1
+    case arg == ")":
+      if numLeftP == 0 {
+        return i, nil
+      } else {
+        numLeftP -= 1
+      }
+    }
+  }
+
+  return 0, errors.New("Unbalanced parens")
+}
+
 func Read(tokens []string, env *Env) (string, error) {
   if len(tokens) == 0 {
     return "", errors.New("Unexpected EOF while reading")
   }
 
-  for i, token := range tokens {
-    switch {
-    case "(" == token:
-      nextParen, err := findNextParen(tokens[i+1:])
-      if err == nil {
-        retVal, err := Eval(tokens[i+1:nextParen+1], env)
-        return strconv.Itoa(retVal), err
-      } else {
-        return "", err
-      }
-    case ")" == token:
-      return "",  errors.New("Unexpected ')'")
-    default:
-      a, e := atomize(token, env)
-      return strconv.Itoa(a.(int)), e
+  firstToken := tokens[0]
+
+  switch firstToken {
+  case "(":
+    mParen, err := findMatchingParen(tokens[1:])
+    if err == nil {
+      retVal, err := Eval(tokens[1:mParen+1], env)
+      return strconv.Itoa(retVal), err
+    } else {
+      return "", err
     }
+  case ")":
+    return "", errors.New("Unexpected ')'")
   }
 
-  return "", nil
+  a, e := atomize(firstToken, env)
+  return strconv.Itoa(a.(int)), e
 }
 
 func Eval(exp []string, env *Env) (int, error) {
@@ -138,16 +154,40 @@ func Eval(exp []string, env *Env) (int, error) {
     return 0, errors.New("No arguments in expression")
   }
 
-  envValue := env.find(exp[0])
-  expLen := len(exp[1:]);
+  funcName := exp[0]
+  envValue := env.find(funcName)
+  expLen := len(exp[1:])
   args := make([]interface{}, expLen)
-  for i, exp := range exp[1:] {
-    atom, _ := atomize(exp, env)
-    args[i] = atom
+
+  ignoreNum := 0
+  for i, val := range exp[1:] {
+    if ignoreNum == 0 {
+      if "(" == val {
+        mParen, _ := findMatchingParen(exp[i+2:])
+        retVal, _ := Eval(exp[i+2:i+2+mParen], env)
+        args[i], _ = atomize(strconv.Itoa(retVal), env)
+        ignoreNum = mParen
+      } else if val != ")" {
+        args[i], _ = atomize(val, env)
+      }
+    } else {
+      ignoreNum -= 1
+    }
   }
 
-  f, _ := envValue.symbols[exp[0]].(func([]interface{}) int)
-  return f(args), nil
+  fargs := Filter(args, (func(x interface{}) bool { return x != nil }))
+  f, _ := envValue.symbols[funcName].(func([]interface{}) int)
+  return f(fargs), nil
+}
+
+func Filter(s []interface{}, fn func(interface{}) bool) []interface{} {
+  var p []interface{} // == nil
+  for _, i := range s {
+    if fn(i) {
+      p = append(p, i)
+    }
+  }
+  return p
 }
 
 func main() {
