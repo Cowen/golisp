@@ -10,8 +10,10 @@ import (
   "strings"
 )
 
+type Value interface{}
+
 type Env struct {
-  symbols  map[string](interface{})
+  symbols  map[string](Value)
   outerEnv *Env
 }
 
@@ -27,20 +29,12 @@ func (env Env) find(v string) Env {
   return Env{}
 }
 
-func reduceInts(init int, f (func(_, _ int) int), nums []int) int {
-  result := init
-  for _, num := range nums {
-    result = f(result, num)
-  }
-  return result
-}
-
 func add_globals(env *Env) {
   if env.symbols == nil {
-    env.symbols = make(map[string](interface{}))
+    env.symbols = make(map[string](Value))
   }
 
-  env.symbols["+"] = func(args []interface{}) int {
+  env.symbols["+"] = func(args []Value) int {
     sum := args[0].(int)
     for _, num := range args[1:] {
       sum += num.(int)
@@ -48,7 +42,7 @@ func add_globals(env *Env) {
     return sum
   }
 
-  env.symbols["-"] = func(args []interface{}) int {
+  env.symbols["-"] = func(args []Value) int {
     diff := args[0].(int)
     for _, num := range args[1:] {
       diff -= num.(int)
@@ -56,7 +50,7 @@ func add_globals(env *Env) {
     return diff
   }
 
-  env.symbols["*"] = func(args []interface{}) int {
+  env.symbols["*"] = func(args []Value) int {
     prod := args[0].(int)
     for _, num := range args[1:] {
       prod = prod * num.(int)
@@ -64,7 +58,7 @@ func add_globals(env *Env) {
     return prod
   }
 
-  env.symbols["/"] = func(args []interface{}) int {
+  env.symbols["/"] = func(args []Value) int {
     quot := args[0].(int)
     for _, num := range args[1:] {
       quot /= num.(int)
@@ -72,7 +66,7 @@ func add_globals(env *Env) {
     return quot
   }
 
-  env.symbols["define"] = func(args []interface{}) int {
+  env.symbols["define"] = func(args []Value) int {
     symbol, val := args[0].(string), args[1]
     env.symbols[symbol] = val
     return 0
@@ -86,7 +80,7 @@ func Tokenize(s string) []string {
   return strings.Fields(rParenStr)
 }
 
-func atomize(token string, env *Env) (interface{}, error) {
+func atomize(token string, env *Env) (Value, error) {
   if v, ok := env.symbols[token]; ok {
     return v, nil
   }
@@ -137,7 +131,7 @@ func Read(tokens []string, env *Env) (string, error) {
     mParen, err := findMatchingParen(tokens[1:])
     if err == nil {
       retVal, err := Eval(tokens[1:mParen+1], env)
-      return strconv.Itoa(retVal), err
+      return fmt.Sprintf("%v", retVal), err
     } else {
       return "", err
     }
@@ -146,7 +140,7 @@ func Read(tokens []string, env *Env) (string, error) {
   }
 
   a, e := atomize(firstToken, env)
-  return strconv.Itoa(a.(int)), e
+  return fmt.Sprintf("%v", a), e
 }
 
 func Eval(exp []string, env *Env) (int, error) {
@@ -157,7 +151,7 @@ func Eval(exp []string, env *Env) (int, error) {
   funcName := exp[0]
   envValue := env.find(funcName)
   expLen := len(exp[1:])
-  args := make([]interface{}, expLen)
+  args := make([]Value, expLen)
 
   ignoreNum := 0
   for i, val := range exp[1:] {
@@ -175,13 +169,13 @@ func Eval(exp []string, env *Env) (int, error) {
     }
   }
 
-  fargs := Filter(args, (func(x interface{}) bool { return x != nil }))
-  f, _ := envValue.symbols[funcName].(func([]interface{}) int)
+  fargs := Filter(args, (func(x Value) bool { return x != nil }))
+  f, _ := envValue.symbols[funcName].(func([]Value) int)
   return f(fargs), nil
 }
 
-func Filter(s []interface{}, fn func(interface{}) bool) []interface{} {
-  var p []interface{} // == nil
+func Filter(s []Value, fn func(Value) bool) []Value {
+  var p []Value // == nil
   for _, i := range s {
     if fn(i) {
       p = append(p, i)
