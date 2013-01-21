@@ -34,7 +34,7 @@ func add_globals(env *Env) {
     env.symbols = make(map[string](Value))
   }
 
-  env.symbols["+"] = func(args []Value) int {
+  env.symbols["+"] = func(args []Value) Value {
     sum := args[0].(int)
     for _, num := range args[1:] {
       sum += num.(int)
@@ -42,7 +42,7 @@ func add_globals(env *Env) {
     return sum
   }
 
-  env.symbols["-"] = func(args []Value) int {
+  env.symbols["-"] = func(args []Value) Value {
     diff := args[0].(int)
     for _, num := range args[1:] {
       diff -= num.(int)
@@ -50,7 +50,7 @@ func add_globals(env *Env) {
     return diff
   }
 
-  env.symbols["*"] = func(args []Value) int {
+  env.symbols["*"] = func(args []Value) Value {
     prod := args[0].(int)
     for _, num := range args[1:] {
       prod = prod * num.(int)
@@ -58,7 +58,7 @@ func add_globals(env *Env) {
     return prod
   }
 
-  env.symbols["/"] = func(args []Value) int {
+  env.symbols["/"] = func(args []Value) Value {
     quot := args[0].(int)
     for _, num := range args[1:] {
       quot /= num.(int)
@@ -66,11 +66,12 @@ func add_globals(env *Env) {
     return quot
   }
 
-  env.symbols["define"] = func(args []Value) int {
+  env.symbols["define"] = func(args []Value) Value {
     symbol, val := args[0].(string), args[1]
     env.symbols[symbol] = val
     return 0
   }
+
 }
 
 func Tokenize(s string) []string {
@@ -143,7 +144,7 @@ func Read(tokens []string, env *Env) (string, error) {
   return fmt.Sprintf("%v", a), e
 }
 
-func Eval(exp []string, env *Env) (int, error) {
+func Eval(exp []string, env *Env) (Value, error) {
   if len(exp) <= 0 {
     return 0, errors.New("No arguments in expression")
   }
@@ -159,7 +160,7 @@ func Eval(exp []string, env *Env) (int, error) {
       if "(" == val {
         mParen, _ := findMatchingParen(exp[i+2:])
         retVal, _ := Eval(exp[i+2:i+2+mParen], env)
-        args[i], _ = atomize(strconv.Itoa(retVal), env)
+        args[i], _ = atomize(fmt.Sprintf("%v",retVal), env)
         ignoreNum = mParen
       } else if val != ")" {
         args[i], _ = atomize(val, env)
@@ -170,7 +171,7 @@ func Eval(exp []string, env *Env) (int, error) {
   }
 
   fargs := Filter(args, (func(x Value) bool { return x != nil }))
-  f, _ := envValue.symbols[funcName].(func([]Value) int)
+  f, _ := envValue.symbols[funcName].(func([]Value) Value)
   return f(fargs), nil
 }
 
